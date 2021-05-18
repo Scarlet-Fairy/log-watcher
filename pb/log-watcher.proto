@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package protobuf;
+
+option go_package = "pb/";
+
+service LogWatcher {
+  rpc GetLogs(GetLogsRequest) returns (GetLogsResponse) {}
+}
+
+message GetLogsRequest {
+  string deploy_id = 1;
+  uint32 offset = 2;
+  uint32 size = 3;
+}
+
+message Log {
+  string timestamp = 1;
+  string body = 2;
+}
+
+message GetLogsResponse {
+  repeated Log logs = 1;
+}
