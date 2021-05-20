@@ -31,7 +31,7 @@ ARG TARGETOS=linux
 ARG TARGETARCH=amd64
 
 RUN GOOS=$TARGETOS GOARCH=$TARGETARCH \
-    go build -mod vendor \
+    go build \
     -o /out/log-watcher \
     ./cmd/log-watcher/main.go
 

@@ -1,29 +1,27 @@
 package elasticsearch
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
 	"github.com/Scarlet-Fairy/log-watcher/pkg/repository"
 	"github.com/Scarlet-Fairy/log-watcher/pkg/service"
-	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/go-kit/kit/log"
+	"github.com/olivere/elastic/v7"
 	"github.com/pkg/errors"
 	"time"
 )
 
 type elasticsearchRepository struct {
-	client *elasticsearch.Client
+	client *elastic.Client
 }
 
 const (
 	CoreIndex       = "scarlet-fairy-core"
-	WorkloadIndex   = "scarlet-fairy-workload"
+	WorkloadIndex   = "scarlet-fairy-workloads"
 	ImageBuildIndex = "scarlet-fairy-imagebuild"
 )
 
-func New(client *elasticsearch.Client, logger log.Logger) service.Repository {
+func New(client *elastic.Client, logger log.Logger) service.Repository {
 	var instance service.Repository
 	{
 		instance = &elasticsearchRepository{
@@ -42,70 +40,33 @@ func (e elasticsearchRepository) query(
 	from uint32,
 	size uint32,
 ) ([]service.Log, error) {
-	queryBody := ReadLogsQuery{
-		Query: Query{
-			Match: map[string]interface{}{
-				"agent.name": jobId,
-			},
-		},
-	}
-	marshaledBody, err := json.Marshal(queryBody)
+
+	res, err := e.client.Search().
+		Index(index).
+		From(int(from)).
+		Size(int(size)).
+		Query(elastic.NewMatchQuery("agent.name", jobId)).
+		Do(ctx)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "Query")
 	}
-
-	res, err := e.client.Search(
-		e.client.Search.WithContext(ctx),
-		e.client.Search.WithIndex(index),
-		e.client.Search.WithBody(bytes.NewReader(marshaledBody)),
-		e.client.Search.WithFrom(int(from)),
-		e.client.Search.WithSize(int(size)),
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		err := res.Body.Close()
-		if err != nil {
-			panic(err)
-		}
-	}()
-
-	if res.IsError() {
-		var resError map[string]interface{}
-		if err := json.NewDecoder(res.Body).Decode(&resError); err != nil {
-			return nil, err
-		}
-
-		return nil, errors.New(
-			fmt.Sprintf(
-				"[%s] Type: %s, Reason: %s",
-				res.Status(),
-				resError["type"],
-				resError["reason"],
-			),
-		)
-	}
-
-	var resBody map[string]interface{}
-	if err := json.NewDecoder(res.Body).Decode(&res); err != nil {
-		return nil, err
-	}
-
-	hits := resBody["hits"].(map[string]interface{})["hits"].([]map[string]interface{})
 
 	var logs []service.Log
-	for _, hit := range hits {
-		source := hit["_source"].(*SearchResponse)
-		timestamp, err := time.Parse(time.RFC3339, source.Timestamp)
+	for _, hit := range res.Hits.Hits {
+		var source map[string]interface{}
+		if err := json.Unmarshal(hit.Source, &source); err != nil {
+			return nil, errors.Wrap(err, "Unmarshaling source")
+		}
+
+		timestamp, err := time.Parse(time.RFC3339, source["@timestamp"].(string))
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "Parsing timestamp")
 		}
 
 		logs = append(logs, service.Log{
-			Id:        hit["_id"].(string),
+			Id:        hit.Id,
 			Timestamp: timestamp,
-			Message:   source.Message,
+			Message:   source["message"].(string),
 		})
 	}
 

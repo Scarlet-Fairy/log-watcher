@@ -1,8 +1,6 @@
 syntax = "proto3";
-
 package protobuf;
-
-option go_package = "pb/";
+option go_package = "github.com/Scarlet-Fairy/gateway/pb";
 
 service LogWatcher {
   rpc GetLogs(GetLogsRequest) returns (GetLogsResponse) {}

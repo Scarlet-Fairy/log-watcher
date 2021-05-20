@@ -10,17 +10,17 @@ import (
 	elasticSearchRepository "github.com/Scarlet-Fairy/log-watcher/pkg/repository/elasticsearch"
 	"github.com/Scarlet-Fairy/log-watcher/pkg/service"
 	grpcTransport "github.com/Scarlet-Fairy/log-watcher/pkg/transport/grpc"
-	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/go-kit/kit/log/level"
 	kitgrpc "github.com/go-kit/kit/transport/grpc"
 	"github.com/oklog/run"
+	"github.com/olivere/elastic/v7"
 	"google.golang.org/grpc"
 	"net"
 	"os"
 )
 
 var (
-	grpcAddr   = flag.String("grpc-url", ":8084", "gRPC server listen address")
+	grpcAddr   = flag.String("grpc-url", ":8085", "gRPC server listen address")
 	elasticUrl = flag.String("es-url", "http://localhost:9200", "url of elasticsearch instance")
 )
 
@@ -47,7 +47,9 @@ func main() {
 			"msg", "failed to init elastic client",
 			"err", err,
 		)
+		os.Exit(1)
 	}
+	defer elasticSearchClient.Stop()
 
 	repositoryInstance := elasticSearchRepository.New(elasticSearchClient, repositoryComponentLogger)
 
@@ -88,10 +90,8 @@ func main() {
 	infoLogger.Log("exit", g.Run())
 }
 
-func newElasticSearchClient(url string) (*elasticsearch.Client, error) {
-	return elasticsearch.NewClient(elasticsearch.Config{
-		Addresses: []string{
-			url,
-		},
-	})
+func newElasticSearchClient(url string) (*elastic.Client, error) {
+	return elastic.NewClient(
+		elastic.SetURL(url),
+	)
 }
