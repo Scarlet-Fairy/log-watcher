@@ -45,10 +45,11 @@ func (e elasticsearchRepository) query(
 		Index(index).
 		From(int(from)).
 		Size(int(size)).
+		Sort("@timestamp", false).
 		Query(elastic.NewMatchQuery("agent.name", jobId)).
 		Do(ctx)
 	if err != nil {
-		return nil, errors.Wrap(err, "Query")
+		return nil, err
 	}
 
 	var logs []service.Log

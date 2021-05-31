@@ -92,6 +92,7 @@ func main() {
 
 func newElasticSearchClient(url string) (*elastic.Client, error) {
 	return elastic.NewClient(
+		elastic.SetSniff(false),
 		elastic.SetURL(url),
 	)
 }
